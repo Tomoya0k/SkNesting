@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220mm" height="2440mm" viewBox="0 0 1220 2440">
+  <defs>
+    <style>
+      .letter { fill: #b9782c; stroke: #8a5a1f; stroke-width: 2; font-family: 'Times New Roman', Georgia, serif; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+      .shape  { fill: #d49a4f; stroke: #8a5a1f; stroke-width: 2; }
+      .label  { fill: #555; font-size: 18px; font-family: Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1220" height="2440" fill="white"/>
+
+  <!-- Letras grandes: varias con huecos, curvas y anchos distintos -->
+  <text class="letter" x="120" y="140" font-size="180">O</text>
+  <text class="letter" x="300" y="140" font-size="180">A</text>
+  <text class="letter" x="480" y="140" font-size="180">D</text>
+  <text class="letter" x="660" y="140" font-size="180">P</text>
+  <text class="letter" x="840" y="140" font-size="180">R</text>
+  <text class="letter" x="1020" y="140" font-size="180">B</text>
+
+  <text class="letter" x="120" y="350" font-size="180">C</text>
+  <text class="letter" x="300" y="350" font-size="180">S</text>
+  <text class="letter" x="480" y="350" font-size="180">U</text>
+  <text class="letter" x="660" y="350" font-size="180">G</text>
+  <text class="letter" x="840" y="350" font-size="180">Q</text>
+  <text class="letter" x="1020" y="350" font-size="180">E</text>
+
+  <text class="letter" x="120" y="560" font-size="180">M</text>
+  <text class="letter" x="300" y="560" font-size="180">W</text>
+  <text class="letter" x="480" y="560" font-size="180">T</text>
+  <text class="letter" x="660" y="560" font-size="180">I</text>
+  <text class="letter" x="840" y="560" font-size="180">H</text>
+  <text class="letter" x="1020" y="560" font-size="180">N</text>
+
+  <text class="letter" x="120" y="770" font-size="180">K</text>
+  <text class="letter" x="300" y="770" font-size="180">Y</text>
+  <text class="letter" x="480" y="770" font-size="180">J</text>
+  <text class="letter" x="660" y="770" font-size="180">L</text>
+  <text class="letter" x="840" y="770" font-size="180">F</text>
+  <text class="letter" x="1020" y="770" font-size="180">Z</text>
+
+  <!-- Figuras irregulares y geométricas -->
+  <!-- Estrellas -->
+  <polygon class="shape" points="85,980 105,1035 165,1035 117,1070 137,1125 85,1090 33,1125 53,1070 5,1035 65,1035"/>
+  <polygon class="shape" points="270,980 290,1035 350,1035 302,1070 322,1125 270,1090 218,1125 238,1070 190,1035 250,1035"/>
+  <polygon class="shape" points="455,980 475,1035 535,1035 487,1070 507,1125 455,1090 403,1125 423,1070 375,1035 435,1035"/>
+
+  <!-- Triángulos -->
+  <polygon class="shape" points="610,1125 540,980 680,980"/>
+  <polygon class="shape" points="810,1125 740,980 880,980"/>
+  <polygon class="shape" points="1010,1125 940,980 1080,980"/>
+
+  <!-- Hexágonos -->
+  <polygon class="shape" points="90,1215 135,1240 135,1290 90,1315 45,1290 45,1240"/>
+  <polygon class="shape" points="270,1215 315,1240 315,1290 270,1315 225,1290 225,1240"/>
+  <polygon class="shape" points="450,1215 495,1240 495,1290 450,1315 405,1290 405,1240"/>
+
+  <!-- Donas / anillos -->
+  <path class="shape" fill-rule="evenodd" d="M620,1265 m-55,0 a55,55 0 1,0 110,0 a55,55 0 1,0 -110,0 M620,1265 m-25,0 a25,25 0 1,1 50,0 a25,25 0 1,1 -50,0"/>
+  <path class="shape" fill-rule="evenodd" d="M830,1265 m-60,0 a60,60 0 1,0 120,0 a60,60 0 1,0 -120,0 M830,1265 m-28,0 a28,28 0 1,1 56,0 a28,28 0 1,1 -56,0"/>
+  <path class="shape" fill-rule="evenodd" d="M1030,1265 m-48,0 a48,48 0 1,0 96,0 a48,48 0 1,0 -96,0 M1030,1265 m-20,0 a20,20 0 1,1 40,0 a20,20 0 1,1 -40,0"/>
+
+  <!-- Formas en L -->
+  <path class="shape" d="M40 1400 H130 V1435 H75 V1540 H40 Z"/>
+  <path class="shape" d="M220 1400 H320 V1435 H255 V1545 H220 Z"/>
+  <path class="shape" d="M400 1400 H520 V1435 H445 V1555 H400 Z"/>
+
+  <!-- Cruces -->
+  <path class="shape" d="M590 1390 H630 V1440 H680 V1480 H630 V1530 H590 V1480 H540 V1440 H590 Z"/>
+  <path class="shape" d="M790 1390 H830 V1440 H880 V1480 H830 V1530 H790 V1480 H740 V1440 H790 Z"/>
+  <path class="shape" d="M990 1390 H1030 V1440 H1080 V1480 H1030 V1530 H990 V1480 H940 V1440 H990 Z"/>
+
+  <!-- Píldoras / cápsulas -->
+  <rect class="shape" x="30" y="1650" width="160" height="70" rx="35" ry="35"/>
+  <rect class="shape" x="230" y="1640" width="190" height="90" rx="45" ry="45"/>
+  <rect class="shape" x="470" y="1655" width="150" height="60" rx="30" ry="30"/>
+
+  <!-- Flechas -->
+  <path class="shape" d="M700 1660 H820 V1625 L900 1690 L820 1755 V1720 H700 Z"/>
+  <path class="shape" d="M940 1660 H1040 V1635 L1110 1690 L1040 1745 V1720 H940 Z"/>
+
+  <!-- Trapezoides -->
+  <polygon class="shape" points="70,1860 170,1860 145,1940 95,1940"/>
+  <polygon class="shape" points="260,1850 380,1850 350,1945 290,1945"/>
+  <polygon class="shape" points="470,1865 580,1865 560,1940 490,1940"/>
+
+  <!-- Círculos y elipses -->
+  <circle class="shape" cx="705" cy="1905" r="45"/>
+  <ellipse class="shape" cx="860" cy="1905" rx="65" ry="40"/>
+  <circle class="shape" cx="1030" cy="1905" r="55"/>
+
+  <!-- Más letras medianas para aumentar carga -->
+  <text class="letter" x="120" y="2160" font-size="150">O</text>
+  <text class="letter" x="250" y="2160" font-size="150">A</text>
+  <text class="letter" x="380" y="2160" font-size="150">R</text>
+  <text class="letter" x="510" y="2160" font-size="150">S</text>
+  <text class="letter" x="640" y="2160" font-size="150">M</text>
+  <text class="letter" x="790" y="2160" font-size="150">U</text>
+  <text class="letter" x="930" y="2160" font-size="150">P</text>
+  <text class="letter" x="1080" y="2160" font-size="150">D</text>
+
+  <!-- Rectángulos con hueco -->
+  <path class="shape" fill-rule="evenodd" d="M60 2255 H180 V2360 H60 Z M95 2290 H145 V2325 H95 Z"/>
+  <path class="shape" fill-rule="evenodd" d="M250 2245 H405 V2370 H250 Z M295 2285 H360 V2335 H295 Z"/>
+  <path class="shape" fill-rule="evenodd" d="M500 2250 H650 V2365 H500 Z M545 2288 H605 V2338 H545 Z"/>
+
+  <!-- Etiqueta discreta -->
+  <text class="label" x="20" y="2420">SVG de prueba para nesting: letras grandes + figuras variadas + huecos + concavidades</text>
+</svg>

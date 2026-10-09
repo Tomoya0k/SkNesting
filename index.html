@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SkNesting · Prueba local</title>
+  </head>
+  <body>
+    <main class="app">
+      <header><h1>SkNesting</h1><p>Prueba local de acomodo de formas SVG</p></header>
+      <section class="panel" aria-label="Parámetros de acomodo">
+        <label class="file-label">Archivo SVG con medidas físicas<input id="file" type="file" accept=".svg,image/svg+xml" /></label>
+        <div class="fields">
+          <label>Ancho de hoja (cm)<input id="width" type="number" min="0" step="any" value="180" /></label>
+          <label>Alto de hoja (cm)<input id="height" type="number" min="0" step="any" value="240" /></label>
+          <label>Separación entre piezas (cm)<input id="gap" type="number" min="0" step="any" value="0.5" /></label>
+          <label>Margen exterior (cm)<input id="edge" type="number" min="0" step="any" value="2" /></label>
+        </div>
+        <div class="actions"><button id="calculate" type="button">Calcular acomodo</button><button id="cancel" type="button" disabled>Cancelar</button></div>
+        <p id="status" role="status">Carga un SVG que tenga width, height y viewBox.</p>
+        <progress id="progress" max="1" value="0" hidden></progress>
+      </section>
+      <section id="results" class="panel" hidden>
+        <div id="summary" class="summary"></div>
+        <div id="sheet-stage" class="sheet-list"></div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

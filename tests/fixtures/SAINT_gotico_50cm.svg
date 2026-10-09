@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1900mm" height="700mm" viewBox="0 0 1900 700" role="img" aria-label="SAINT estilo gótico">
+  <title>SAINT estilo gótico — letras de 50 cm de alto</title>
+  <desc>SVG de prueba con la palabra SAINT en estilo gótico/blackletter. Cada letra está planteada con altura aproximada de 500 mm (50 cm). Usa texto editable con una pila de fuentes góticas.</desc>
+  <metadata>
+    <measure:dimensions xmlns:measure="urn:digital-a:physical-measurements" unit="mm" width="1900" height="700" letterHeight="500" text="SAINT" style="gothic-blackletter"/>
+  </metadata>
+
+  <rect x="0" y="0" width="1900" height="700" fill="white"/>
+
+  <!-- Guía base visual opcional -->
+  <g opacity="0.0">
+    <line x1="0" y1="600" x2="1900" y2="600" stroke="#999" stroke-width="1"/>
+  </g>
+
+  <!-- Letras individuales -->
+  <g fill="#111111" stroke="#111111" stroke-width="4"
+     font-family="UnifrakturCook, Old English Text MT, Cloister Black, serif"
+     font-weight="700" text-anchor="middle" dominant-baseline="alphabetic">
+
+    <text x="180"  y="560" font-size="500">S</text>
+    <text x="520"  y="560" font-size="500">A</text>
+    <text x="860"  y="560" font-size="500">I</text>
+    <text x="1200" y="560" font-size="500">N</text>
+    <text x="1540" y="560" font-size="500">T</text>
+  </g>
+</svg>
