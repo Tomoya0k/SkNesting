@@ -84,12 +84,12 @@ calculate.onclick = async () => {
   worker = new Worker(new URL('./nesting.worker.ts', import.meta.url), {type: 'module'});
   calculate.disabled = true; cancel.disabled = false; progress.hidden = false; progress.value = 0;
   setStatus(`Analizando ${format.toUpperCase()} y calculando acomodo…`);
-  const timeout = window.setTimeout(() => { if (worker && id === active) { stop(); setStatus('El cálculo superó 120 segundos. Simplifica el SVG o reduce las piezas.', true); } }, 120_000);
+  const timeout = window.setTimeout(() => { if (worker && id === active) { stop(); setStatus('El cálculo superó 180 segundos. Simplifica el SVG o reduce las piezas.', true); } }, 180_000);
   worker.onmessage = (event: MessageEvent<{id: number; kind: string; result?: NestingResult; progress?: ProgressEvent; message?: string}>) => {
     const message = event.data; if (message.id !== active) return;
     if (message.kind === 'progress' && message.progress) {
       progress.value = Math.min(0.95, message.progress.completed / Math.max(1, message.progress.total));
-      if (message.progress.stage === 'repair') setStatus('Revisando espacios entre piezas para reducir el consumo de hoja…');
+      if (message.progress.stage === 'repair') setStatus('Revisando giros y espacios entre piezas para reducir el consumo de hoja…');
       return;
     }
     window.clearTimeout(timeout); stop();

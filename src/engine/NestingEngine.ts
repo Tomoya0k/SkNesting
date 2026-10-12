@@ -6,7 +6,7 @@ import type {NestingConfig, NestingResult, Piece, ProgressEvent, Rotation} from 
 
 const empty = (error: string): NestingResult => ({placements: [], hierarchy: [], regions: [], sheetCount: 0, netAreaMm2: 0, usedMaterialSheets: 0, fullSheets: 0, sharedQuarterSheets: 0, limited: false, error, engineVersion: 'nfp-ga-v1'});
 export class NestingEngine {
-  static runSync(pieces: readonly Piece[], config: NestingConfig, onProgress?: (progress: ProgressEvent) => void, deadlineMs = performance.now() + 110_000): NestingResult {
+  static runSync(pieces: readonly Piece[], config: NestingConfig, onProgress?: (progress: ProgressEvent) => void, deadlineMs = performance.now() + 170_000): NestingResult {
     try {
       const width = config.sheetWidthMm, height = config.sheetHeightMm, edge = config.edgeMarginMm ?? 20;
       if (![width, height, edge, config.gapMm].every(Number.isFinite) || width <= 2 * edge || height <= 2 * edge || edge < 0 || config.gapMm < 0) throw new Error('Dimensiones de hoja, margen o separación inválidos.');

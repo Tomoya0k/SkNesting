@@ -140,6 +140,34 @@ test('recoloca una pieza en una cavidad abierta con pared inclinada', () => {
   assert.ok(minimumBoundaryDistance(first.polygon, second.polygon) >= 5 - 1e-7);
 });
 
+test('gira una pieza pequeña en la misma hoja para reducir la altura ocupada', () => {
+  const large = piece('bloque', rectangle(160, 100));
+  const small = piece('tira', rectangle(30, 10));
+  const parts = [large, small], config = {sheetWidthMm: 200, sheetHeightMm: 200, gapMm: 5, edgeMarginMm: 10};
+  const initial = finalize([[placed(large, 0, 10, 10), placed(small, 0, 10, 160)]], parts, config);
+  const result = improveFastLayout(parts, config, initial, Array.from({length: 24}, (_, index) => index * 15), performance.now() + 4_000);
+  const moved = result.placements.find(item => item.pieceId === small.id)!;
+  assert.equal(result.sheetCount, 1);
+  assert.ok(result.regions[0].usedHeight < initial.regions[0].usedHeight);
+  assert.ok(moved.rotation % 180 === 90, `giro elegido: ${moved.rotation}°`);
+  assert.equal(materialOverlaps(result.placements[0].polygon, result.placements[1].polygon), false);
+  assert.ok(minimumBoundaryDistance(result.placements[0].polygon, result.placements[1].polygon) >= 5 - 1e-7);
+});
+
+test('gira una pieza pequeña para trasladarla a una hoja anterior', () => {
+  const large = piece('bloque', rectangle(145, 155));
+  const small = piece('tira', rectangle(30, 10));
+  const parts = [large, small], config = {sheetWidthMm: 180, sheetHeightMm: 180, gapMm: 5, edgeMarginMm: 10};
+  const initial = finalize([[placed(large, 0, 10, 10)], [placed(small, 1, 10, 10)]], parts, config);
+  const result = improveFastLayout(parts, config, initial, Array.from({length: 24}, (_, index) => index * 15), performance.now() + 4_000);
+  const moved = result.placements.find(item => item.pieceId === small.id)!;
+  assert.equal(result.sheetCount, 1);
+  assert.ok(moved.rotation % 180 === 90, `giro elegido: ${moved.rotation}°`);
+  assert.ok(consumedSheets(result) < consumedSheets(initial));
+  assert.equal(materialOverlaps(result.placements[0].polygon, result.placements[1].polygon), false);
+  assert.ok(minimumBoundaryDistance(result.placements[0].polygon, result.placements[1].polygon) >= 5 - 1e-7);
+});
+
 test('conserva el acomodo inicial cuando se agota el tiempo de mejora', () => {
   const large = piece('grande', rectangle(60, 60)), small = piece('pequeña', rectangle(10, 10));
   const parts = [large, small], config = {sheetWidthMm: 100, sheetHeightMm: 100, gapMm: 5, edgeMarginMm: 10};

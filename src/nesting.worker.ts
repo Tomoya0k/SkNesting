@@ -23,7 +23,7 @@ function loadFonts(): Promise<SvgFonts> {
 }
 self.onmessage = async (event: MessageEvent<Request>) => {
   const {id, source, format, config} = event.data;
-  const deadlineMs = performance.now() + 110_000;
+  const deadlineMs = performance.now() + 170_000;
   try {
     const svg = format === 'eps' ? EpsConverter.toSvg(source as ArrayBuffer) : source as string;
     const fonts = /<text(?:\s|>)/i.test(svg) ? await loadFonts() : undefined;

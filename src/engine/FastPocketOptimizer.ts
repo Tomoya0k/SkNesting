@@ -3,7 +3,7 @@ import {finalize, parentFor, rotatePiece, validPosition, type OrientedPiece} fro
 import {NFPGenerator, WorkLimitError} from './NFPGenerator.ts';
 import type {NestingConfig, NestingResult, Piece, Placement, Point, ProgressEvent, Rotation} from './types.ts';
 
-interface Pose {shape: OrientedPiece; x: number; y: number; sheet: number; overlap: number; consumption: number}
+interface Pose {shape: OrientedPiece; x: number; y: number; sheet: number; overlap: number; consumption: number; usedHeight: number; usedWidth: number}
 const QUARTERS = [0.25, 0.5, 0.75, 1] as const;
 const angleOrder = (angles: readonly Rotation[]) => [...angles].sort((a, b) => (a % 45 === 0 ? 0 : 1) - (b % 45 === 0 ? 0 : 1) || a - b);
 
@@ -40,20 +40,28 @@ function fractionFor(placed: readonly Placement[], shapes: ReadonlyMap<string, O
   return QUARTERS.find(fraction => used + (config.edgeMarginMm ?? 20) <= config.sheetHeightMm * fraction + 1e-7) ?? 1;
 }
 
+const usedHeight = (placed: readonly Placement[]) => Math.max(0, ...placed.map(item => item.y + item.height));
+const usedWidth = (placed: readonly Placement[]) => Math.max(0, ...placed.map(item => item.x + item.width));
+const improvesDimensions = (height: number, width: number, priorHeight: number, priorWidth: number) =>
+  height <= priorHeight + 1e-7 && width <= priorWidth + 1e-7 &&
+  (height < priorHeight - 1e-7 || width < priorWidth - 1e-7);
+
 function better(a: Pose, b: Pose | null): boolean {
   if (!b) return true;
   if (Math.abs(a.consumption - b.consumption) > 1e-7) return a.consumption < b.consumption;
   if (a.sheet !== b.sheet) return a.sheet < b.sheet;
+  if (Math.abs(a.usedHeight - b.usedHeight) > 1e-7) return a.usedHeight < b.usedHeight;
+  if (Math.abs(a.usedWidth - b.usedWidth) > 1e-7) return a.usedWidth < b.usedWidth;
   if (Math.abs(a.overlap - b.overlap) > 1e-5) return a.overlap > b.overlap;
   return a.y < b.y - 1e-7 || Math.abs(a.y - b.y) <= 1e-7 && (a.x < b.x - 1e-7 || Math.abs(a.x - b.x) <= 1e-7 && a.shape.rotation < b.shape.rotation);
 }
 
-/** Improve a valid fast layout by relocating leaf pieces into earlier sheets. */
+/** Improve a valid fast layout by rotating or relocating small leaf pieces. */
 export function improveFastLayout(
   pieces: readonly Piece[], config: NestingConfig, initial: NestingResult, rotations: readonly Rotation[],
   deadlineMs: number, onProgress?: (progress: ProgressEvent) => void,
 ): NestingResult {
-  if (initial.error || initial.sheetCount < 2 || performance.now() >= deadlineMs) return initial;
+  if (initial.error || performance.now() >= deadlineMs) return initial;
   const started = performance.now(), sheetArea = config.sheetWidthMm * config.sheetHeightMm;
   const pieceById = new Map(pieces.map(piece => [piece.id, piece]));
   const shapes = new Map<string, OrientedPiece>();
@@ -73,30 +81,31 @@ export function improveFastLayout(
 
   for (let pass = 0; pass < 2 && performance.now() < deadlineMs; pass++) {
     const parents = new Set(current.placements.flatMap(item => item.parentPieceId ? [item.parentPieceId] : []));
-    const movable = current.placements.filter(item => item.sheet > 0 && !parents.has(item.pieceId) && polygonArea(item.polygon) <= sheetArea * 0.03)
+    const movable = current.placements.filter(item => !parents.has(item.pieceId) && polygonArea(item.polygon) <= sheetArea * 0.03)
       .sort((a, b) => b.sheet - a.sheet || polygonArea(a.polygon) - polygonArea(b.polygon) || a.pieceId.localeCompare(b.pieceId));
     let changed = false;
-    for (const mobile of movable) {
+    for (const [index, mobile] of movable.entries()) {
       if (performance.now() >= deadlineMs) break;
+      const pieceDeadline = Math.min(deadlineMs, performance.now() + Math.min(8_000, (deadlineMs - performance.now()) / (movable.length - index)));
       const sheets = Array.from({length: current.sheetCount}, (_, index) => current.placements.filter(item => item.sheet === index));
       const source = sheets[mobile.sheet];
       const sourceWithout = source.filter(item => item.pieceId !== mobile.pieceId);
       const originalConsumption = current.regions.reduce((sum, region) => sum + region.fraction, 0);
       const sourceFraction = fractionFor(sourceWithout, shapes, config);
-      const minimumConsumption = originalConsumption - current.regions[mobile.sheet].fraction + sourceFraction;
       let best: Pose | null = null;
-      for (let destination = 0; destination < mobile.sheet && performance.now() < deadlineMs; destination++) {
-        const placed = sheets[destination];
+      for (let destination = 0; destination <= mobile.sheet && performance.now() < pieceDeadline; destination++) {
+        const placed = destination === mobile.sheet ? sourceWithout : sheets[destination];
         const originalFraction = fractionFor(placed, shapes, config);
         const edge = config.edgeMarginMm ?? 20;
-        for (const angle of angles) {
-          if (performance.now() >= deadlineMs) break;
+        for (const [angleIndex, angle] of angles.entries()) {
+          if (performance.now() >= pieceDeadline) break;
           const shape = shapeFor(mobile.pieceId, angle);
           const minX = edge + shape.approximationErrorMm, minY = minX;
           const maxX = config.sheetWidthMm - edge - shape.approximationErrorMm - shape.width;
           const maxY = config.sheetHeightMm - edge - shape.approximationErrorMm - shape.height;
           if (maxX < minX || maxY < minY) { progress(); continue; }
-          const angleDeadline = Math.min(deadlineMs, performance.now() + (best ? 250 : 650));
+          const remainingAngles = (mobile.sheet - destination) * angles.length + angles.length - angleIndex;
+          const angleDeadline = Math.min(pieceDeadline, performance.now() + Math.min(best ? 500 : 900, (pieceDeadline - performance.now()) / remainingAngles));
           const seen = new Set<string>();
           const local: {pose: Pose | null} = {pose: null};
           const probe = (x: number, y: number) => {
@@ -106,9 +115,16 @@ export function improveFastLayout(
             seen.add(key);
             const polygon = translatePolygon(shape.polygon, x, y);
             if (!validPosition(polygon, shape, x, y, placed, shapes, config)) return;
-            const targetFraction = fractionFor([...placed, {pieceId: shape.id, sheet: destination, x, y, width: shape.width, height: shape.height, rotation: angle, polygon}], shapes, config);
+            const target = [...placed, {pieceId: shape.id, sheet: destination, x, y, width: shape.width, height: shape.height, rotation: angle, polygon}];
+            const targetFraction = fractionFor(target, shapes, config);
+            const targetHeight = usedHeight(target), targetWidth = usedWidth(target);
+            if (destination === mobile.sheet && targetFraction >= current.regions[mobile.sheet].fraction - 1e-7 &&
+                !improvesDimensions(targetHeight, targetWidth, current.regions[mobile.sheet].usedHeight, current.regions[mobile.sheet].usedWidth)) return;
             const pose: Pose = {shape, x, y, sheet: destination, overlap: bboxOverlap(x, y, shape, placed),
-              consumption: originalConsumption - current.regions[mobile.sheet].fraction - originalFraction + sourceFraction + targetFraction};
+              consumption: destination === mobile.sheet ? originalConsumption - current.regions[mobile.sheet].fraction + targetFraction :
+                originalConsumption - current.regions[mobile.sheet].fraction - originalFraction + sourceFraction + targetFraction,
+              usedHeight: targetHeight + (destination === mobile.sheet ? 0 : usedHeight(sourceWithout)),
+              usedWidth: targetWidth + (destination === mobile.sheet ? 0 : usedWidth(sourceWithout))};
             if (better(pose, local.pose)) local.pose = pose;
           };
           // NFP boundary vertices are exact contact candidates when both outlines are modest.
@@ -134,9 +150,11 @@ export function improveFastLayout(
           const mobileFeatures = features(shape.polygon.outer, 12);
           const contacts: {x: number; y: number; overlap: number}[] = [];
           for (const other of placed) {
+            if (performance.now() >= angleDeadline) break;
             const staticFeatures = features(other.polygon.outer, 48);
             const clearance = config.gapMm + shape.approximationErrorMm + shapeFor(other.pieceId, other.rotation).approximationErrorMm;
             for (const fixed of staticFeatures) for (const moving of mobileFeatures) {
+              if (performance.now() >= angleDeadline) break;
               for (const [dx, dy] of [[clearance, 0], [-clearance, 0], [0, clearance], [0, -clearance]]) {
                 const x = fixed.x - moving.x + dx, y = fixed.y - moving.y + dy;
                 if (x >= minX && x <= maxX && y >= minY && y <= maxY) contacts.push({x, y, overlap: bboxOverlap(x, y, shape, placed)});
@@ -175,7 +193,6 @@ export function improveFastLayout(
           }
           progress();
         }
-        if (best && best.sheet === 0 && best.consumption <= minimumConsumption + 1e-7) break;
       }
       if (!best || best.consumption > originalConsumption + 1e-7) continue;
       const {shape, x, y, sheet} = best;
@@ -189,7 +206,13 @@ export function improveFastLayout(
       const newWeight = candidate.placements.reduce((sum, item) => sum + item.sheet * polygonArea(item.polygon), 0);
       const oldConsumption = current.regions.reduce((sum, region) => sum + region.fraction, 0);
       const newConsumption = candidate.regions.reduce((sum, region) => sum + region.fraction, 0);
-      if (newConsumption < oldConsumption - 1e-7 || Math.abs(newConsumption - oldConsumption) <= 1e-7 && newWeight < oldWeight - 1e-7) {
+      const oldHeight = current.regions.reduce((sum, region) => sum + region.usedHeight, 0);
+      const newHeight = candidate.regions.reduce((sum, region) => sum + region.usedHeight, 0);
+      const oldWidth = current.regions.reduce((sum, region) => sum + region.usedWidth, 0);
+      const newWidth = candidate.regions.reduce((sum, region) => sum + region.usedWidth, 0);
+      if (newConsumption < oldConsumption - 1e-7 || Math.abs(newConsumption - oldConsumption) <= 1e-7 &&
+          (newWeight < oldWeight - 1e-7 || Math.abs(newWeight - oldWeight) <= 1e-7 &&
+            improvesDimensions(newHeight, newWidth, oldHeight, oldWidth))) {
         current = candidate; changed = true; progress();
       }
     }
