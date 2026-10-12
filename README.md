@@ -1,6 +1,6 @@
 # SkNesting
 
-Motor y página local de prueba para acomodar contornos SVG en hojas rectangulares.
+Motor y página local de prueba para acomodar contornos SVG y EPS en hojas rectangulares.
 
 ## Iniciar
 
@@ -11,15 +11,17 @@ npm install
 npm run dev
 ```
 
-Abre `http://127.0.0.1:5175/`. Vite escucha únicamente en `127.0.0.1`. Carga un archivo SVG y pulsa **Calcular acomodo**. El archivo se procesa en el navegador mediante un Web Worker; la página no lo sube a ningún servidor.
+Abre `http://127.0.0.1:5175/`. Vite escucha únicamente en `127.0.0.1`. Carga un archivo SVG o EPS y pulsa **Calcular acomodo**. El archivo se procesa en el navegador mediante un Web Worker; la página no lo sube a ningún servidor.
 
 En la página, ancho, alto, separación y margen se introducen en centímetros; el motor los convierte a milímetros. Cada hoja física se muestra completa; cuando hay varias, se colocan en columnas si el espacio lo permite. El fondo azul claro marca la franja contabilizada y la línea discontinua separa el resto disponible. **Hojas consumidas** suma las franjas usadas de todas las hojas y redondea hacia arriba al siguiente cuarto de hoja; **Hojas físicas** indica cuántas hojas aparecen en el acomodo.
 
 El SVG debe tener `width` y `height` en `mm`, `cm`, `in` o `pt` y un `viewBox` válido. El importador admite `path`, `rect` (también redondeado), `circle`, `ellipse`, `polygon`, `polyline` con relleno y texto sencillo. Convierte el texto a contornos con Tinos o Arimo incorporadas, equivalentes libres de Times New Roman y Arial; la forma puede variar ligeramente si el archivo usó otra fuente. Omite rectángulos blancos que cubren todo el `viewBox` y textos con clase `label`, `annotation` o `caption`, pues los trata como fondo o anotaciones. El parser también admite líneas de path, Bézier cuadráticas y cúbicas, arcos, transformaciones SVG y `fill-rule` (`evenodd` o `nonzero`). Las líneas abiertas y el texto con `tspan` siguen requiriendo contornos cerrados.
 
+El EPS debe ser vectorial y declarar `%%BoundingBox` o `%%HiResBoundingBox`; sus unidades son puntos PostScript (72 por pulgada). Admite una previsualización binaria encapsulada, instrucciones de dibujo, transformaciones, curvas Bézier y rellenos normal o par-impar. Cada operación de relleno produce una figura o un conjunto de figuras; los subcontornos interiores se conservan como agujeros. Los trazos abiertos, texto editable, imágenes raster y recortes complejos se rechazan con un mensaje específico para evitar que falte material en el acomodo. Convierte esos elementos a contornos cerrados en el editor antes de importar. La lectura de EPS usa [UDOC.js](https://github.com/NineBitsLLC/UDOC.js), incluido bajo su licencia MIT en `src/vendor/udoc/LICENSE`.
+
 ## Motor
 
-`GeometryParser.parseSvg(source, toleranceMm)` devuelve piezas con contorno exterior y agujeros en milímetros. `NestingEngine.run(pieces, config)` devuelve una promesa con el resultado; `runSync` usa el mismo núcleo cuando ya se está en un Worker o en Node.
+`GeometryParser.parseSvg(source, toleranceMm)` y `GeometryParser.parseEps(arrayBuffer, toleranceMm)` devuelven piezas con contorno exterior y agujeros en milímetros. `NestingEngine.run(pieces, config)` devuelve una promesa con el resultado; `runSync` usa el mismo núcleo cuando ya se está en un Worker o en Node.
 
 ```ts
 import {GeometryParser} from './src/engine/GeometryParser.ts';

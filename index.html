@@ -7,9 +7,9 @@
   </head>
   <body>
     <main class="app">
-      <header><h1>SkNesting</h1><p>Prueba local de acomodo de formas SVG</p></header>
+      <header><h1>SkNesting</h1><p>Prueba local de acomodo de formas SVG y EPS</p></header>
       <section class="panel" aria-label="Parámetros de acomodo">
-        <label class="file-label">Archivo SVG con medidas físicas<input id="file" type="file" accept=".svg,image/svg+xml" /></label>
+        <label class="file-label">Archivo SVG o EPS con medidas físicas<input id="file" type="file" accept=".svg,.eps,image/svg+xml,application/postscript" /></label>
         <div class="fields">
           <label>Ancho de hoja (cm)<input id="width" type="number" min="0" step="any" value="180" /></label>
           <label>Alto de hoja (cm)<input id="height" type="number" min="0" step="any" value="240" /></label>
@@ -17,7 +17,7 @@
           <label>Margen exterior (cm)<input id="edge" type="number" min="0" step="any" value="2" /></label>
         </div>
         <div class="actions"><button id="calculate" type="button">Calcular acomodo</button><button id="cancel" type="button" disabled>Cancelar</button></div>
-        <p id="status" role="status">Carga un SVG que tenga width, height y viewBox.</p>
+        <p id="status" role="status">Carga un SVG con medidas físicas o un EPS con BoundingBox.</p>
         <progress id="progress" max="1" value="0" hidden></progress>
       </section>
       <section id="results" class="panel" hidden>

@@ -1,6 +1,7 @@
 import {XMLParser, XMLValidator} from 'fast-xml-parser';
 import {SVGPathData} from 'svg-pathdata';
 import {cleanRing, filledRings} from './PolygonOperations.ts';
+import {EpsConverter} from './EpsConverter.ts';
 import type {Piece, Point, Ring} from './types.ts';
 import type {Font} from 'opentype.js';
 
@@ -216,6 +217,10 @@ function textPath(value: string, attrs: Record<string, string>, style: Style, fo
 
 export interface ParsedSvg { widthMm: number; heightMm: number; pieces: Piece[] }
 export class GeometryParser {
+  static parseEps(source: ArrayBuffer, toleranceMm = 0.25): ParsedSvg {
+    return GeometryParser.parseSvg(EpsConverter.toSvg(source), toleranceMm);
+  }
+
   static parseSvg(source: string, toleranceMm = 0.25, fonts?: SvgFonts): ParsedSvg {
     if (!Number.isFinite(toleranceMm) || toleranceMm <= 0 || toleranceMm > 5) throw new Error('La tolerancia debe estar entre 0 y 5 mm.');
     if (source.length > 8_000_000 || /<!DOCTYPE|<!ENTITY/i.test(source)) throw new Error('SVG demasiado grande o con entidades no admitidas.');

@@ -71,16 +71,19 @@ function render() {
 function stop() { if (worker) { worker.terminate(); worker = null; } calculate.disabled = false; cancel.disabled = true; progress.hidden = true; }
 calculate.onclick = async () => {
   const selected = file.files?.[0];
-  if (!selected) { setStatus('Selecciona un archivo SVG.', true); return; }
-  if (selected.size > 8_000_000) { setStatus('El SVG supera 8 MB.', true); return; }
+  if (!selected) { setStatus('Selecciona un archivo SVG o EPS.', true); return; }
+  const format = /\.eps$/i.test(selected.name) || selected.type === 'application/postscript' ? 'eps' : /\.svg$/i.test(selected.name) || selected.type === 'image/svg+xml' ? 'svg' : null;
+  if (!format) { setStatus('Selecciona un archivo SVG o EPS.', true); return; }
+  const limitMb = format === 'eps' ? 16 : 8;
+  if (selected.size > limitMb * 1_000_000) { setStatus(`El archivo supera ${limitMb} MB.`, true); return; }
   const sheetWidthMm = cmToMm(width.value), sheetHeightMm = cmToMm(height.value), gapMm = cmToMm(gap.value), edgeMarginMm = cmToMm(edge.value);
   if ([width, height, gap, edge].some(input => !input.value.trim()) || ![sheetWidthMm, sheetHeightMm, gapMm, edgeMarginMm].every(Number.isFinite) || sheetWidthMm <= 2 * edgeMarginMm || sheetHeightMm <= 2 * edgeMarginMm || edgeMarginMm < 0 || gapMm < 0) { setStatus('Indica dimensiones mayores que el doble del margen y separaciones no negativas, en cm.', true); return; }
   stop(); results.hidden = true; current = null;
   config = {sheetWidthMm, sheetHeightMm, gapMm, edgeMarginMm, curveToleranceMm: 0.25};
-  const source = await selected.text(), id = ++active;
+  const source = format === 'eps' ? await selected.arrayBuffer() : await selected.text(), id = ++active;
   worker = new Worker(new URL('./nesting.worker.ts', import.meta.url), {type: 'module'});
   calculate.disabled = true; cancel.disabled = false; progress.hidden = false; progress.value = 0;
-  setStatus('Analizando SVG y calculando acomodo…');
+  setStatus(`Analizando ${format.toUpperCase()} y calculando acomodo…`);
   const timeout = window.setTimeout(() => { if (worker && id === active) { stop(); setStatus('El cálculo superó 120 segundos. Simplifica el SVG o reduce las piezas.', true); } }, 120_000);
   worker.onmessage = (event: MessageEvent<{id: number; kind: string; result?: NestingResult; progress?: ProgressEvent; message?: string}>) => {
     const message = event.data; if (message.id !== active) return;
@@ -97,9 +100,9 @@ calculate.onclick = async () => {
       setStatus(`${current?.error ?? 'No se obtuvo un resultado.'}${detail ? ` Orientaciones: ${detail}.` : ''}`, true); return;
     }
     const count = current.placements.length;
-    setStatus(current.method === 'fast' ? `Acomodo válido de ${count} piezas con método rápido para SVG complejo.` : current.limited ? `Acomodo válido de ${count} piezas; se alcanzó el límite de cálculo.` : `Acomodo terminado: ${count} piezas.`); render();
+    setStatus(current.method === 'fast' ? `Acomodo válido de ${count} piezas con método rápido para archivo complejo.` : current.limited ? `Acomodo válido de ${count} piezas; se alcanzó el límite de cálculo.` : `Acomodo terminado: ${count} piezas.`); render();
   };
   worker.onerror = event => { window.clearTimeout(timeout); stop(); setStatus(event.message || 'Error en el Worker.', true); };
-  worker.postMessage({id, source, config});
+  worker.postMessage({id, source, format, config});
 };
 cancel.onclick = () => { active++; stop(); setStatus('Cálculo cancelado.'); };
