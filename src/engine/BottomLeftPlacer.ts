@@ -99,6 +99,9 @@ export function parentFor(shape: OrientedPiece, x: number, y: number, placed: re
     const original = shapes.get(`${other.pieceId}:${other.rotation}`)!;
     const clearance = config.gapMm + shape.approximationErrorMm + original.approximationErrorMm;
     for (const [index, hole] of original.polygon.holes.entries()) {
+      const box = bounds(hole.outer), localX = x - other.x, localY = y - other.y;
+      if (localX < box.minX + clearance - 1e-7 || localY < box.minY + clearance - 1e-7 ||
+          localX + shape.width > box.maxX - clearance + 1e-7 || localY + shape.height > box.maxY - clearance + 1e-7) continue;
       if (fitsInside(hole, shape.polygon, x - other.x, y - other.y, clearance)) return {parentPieceId: other.pieceId, parentHoleIndex: index};
     }
   }

@@ -1,11 +1,13 @@
 import {GeneticOptimizer} from './GeneticOptimizer.ts';
 import {baseline} from './BottomLeftPlacer.ts';
 import {improveFastLayout} from './FastPocketOptimizer.ts';
+import {improveRasterLayout} from './RasterOptimizer.ts';
 import {boundaryRings, cleanRing, polygonArea, triangulatePolygon} from './PolygonOperations.ts';
 import type {NestingConfig, NestingResult, Piece, ProgressEvent, Rotation} from './types.ts';
 
 const empty = (error: string): NestingResult => ({placements: [], hierarchy: [], regions: [], sheetCount: 0, netAreaMm2: 0, usedMaterialSheets: 0, fullSheets: 0, sharedQuarterSheets: 0, limited: false, error, engineVersion: 'nfp-ga-v1'});
 const FAST_REPAIR_BUDGET_MS = 30_000;
+const REPACK_BUDGET_MS = 60_000;
 function fastScore(result: NestingResult, pieces: readonly Piece[], sheetArea: number): number[] {
   const areaById = new Map(pieces.map(piece => [piece.id, polygonArea(piece.polygon)]));
   const largeDiagonalArea = result.placements.reduce((sum, item) =>
@@ -57,6 +59,9 @@ export class NestingEngine {
           if (betterFastLayout(upright, result, pieces, width * height)) result = upright;
         }
         if (result.error) return result;
+        const repackDeadline = Math.min(deadlineMs - Math.min(15_000, Math.max(0, deadlineMs - performance.now()) / 4), performance.now() + REPACK_BUDGET_MS);
+        try { result = improveRasterLayout(pieces, {...config, edgeMarginMm: edge}, result, rotations, repackDeadline, onProgress); }
+        catch { /* Keep the complete certified layout if repacking fails. */ }
         let improved = result;
         const repairDeadline = Math.min(deadlineMs, performance.now() + FAST_REPAIR_BUDGET_MS);
         try { improved = improveFastLayout(pieces, {...config, edgeMarginMm: edge}, result, rotations, repairDeadline, onProgress); }

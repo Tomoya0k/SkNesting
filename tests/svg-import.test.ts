@@ -5,7 +5,7 @@ import opentype from 'opentype.js';
 import {GeometryParser, type SvgFonts} from '../src/engine/GeometryParser.ts';
 import {NestingEngine} from '../src/engine/NestingEngine.ts';
 import {rotatePiece} from '../src/engine/BottomLeftPlacer.ts';
-import {materialOverlaps, minimumBoundaryDistance} from '../src/engine/PolygonOperations.ts';
+import {materialOverlaps, minimumBoundaryDistance, polygonArea} from '../src/engine/PolygonOperations.ts';
 import {consumedSheets} from '../src/sheetUsage.ts';
 
 async function font(path: string) {
@@ -48,9 +48,12 @@ test('acomoda el SVG complejo de Ciudad Maderas sin agotar el cálculo', async (
   assert.equal(result.placements.length, pieces.length);
   assert.equal(result.method, 'fast');
   assert.ok(result.placements.some(placement => placement.rotation % 90 !== 0));
-  assert.ok(consumedSheets(result) <= 3);
-  assert.ok(result.placements.some(placement => ['pieza-23', 'pieza-25', 'pieza-29', 'pieza-35'].includes(placement.pieceId) &&
-    placement.sheet === 0 && placement.x >= 200 && placement.x < 790 && placement.y < 2_000));
+  assert.ok(consumedSheets(result) <= 2.5, `consumo: ${consumedSheets(result)} hojas`);
+  const sheetArea = 1800 * 2400;
+  assert.ok(result.placements.some(small => !small.parentPieceId && polygonArea(small.polygon) <= sheetArea * 0.03 &&
+    result.placements.some(large => large.sheet === small.sheet && polygonArea(large.polygon) > sheetArea * 0.03 &&
+      small.x < large.x + large.width && small.x + small.width > large.x &&
+      small.y < large.y + large.height && small.y + small.height > large.y)), 'debe ocupar una concavidad abierta entre contornos grandes');
   const shapes = new Map(result.placements.map(placement => {
     const original = pieces.find(piece => piece.id === placement.pieceId)!;
     return [placement.pieceId, rotatePiece(original, placement.rotation)] as const;

@@ -90,6 +90,7 @@ calculate.onclick = async () => {
     if (message.kind === 'progress' && message.progress) {
       progress.value = Math.min(0.95, message.progress.completed / Math.max(1, message.progress.total));
       if (message.progress.stage === 'repair') setStatus('Revisando giros y espacios entre piezas para reducir el consumo de hoja…');
+      if (message.progress.stage === 'repack') setStatus(`Comparando acomodos completos. Mejor consumo: ${fmt(message.progress.bestConsumedSheets ?? message.progress.bestSheetCount)} hojas…`);
       return;
     }
     window.clearTimeout(timeout); stop();

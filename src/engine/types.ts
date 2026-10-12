@@ -75,4 +75,4 @@ export interface NestingResult {
   engineVersion: 'nfp-ga-v1';
 }
 
-export interface ProgressEvent { completed: number; total: number; bestSheetCount: number; stage?: 'repair' }
+export interface ProgressEvent { completed: number; total: number; bestSheetCount: number; bestConsumedSheets?: number; stage?: 'repair' | 'repack' }
