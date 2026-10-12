@@ -1,27 +1,37 @@
 # SkNesting
 
-Motor y página local de prueba para acomodar contornos SVG y EPS en hojas rectangulares.
+Acomoda piezas vectoriales en hojas rectangulares. La aplicación funciona en el navegador y procesa los archivos localmente, sin subirlos a un servidor.
 
-## Iniciar
+## Uso local
 
-Requiere Node.js 24.14 o posterior. Desde esta carpeta:
+Requiere Node.js 24.14 o posterior.
 
-```powershell
-npm install
+```sh
+npm ci
 npm run dev
 ```
 
-Abre `http://127.0.0.1:5175/`. Vite escucha únicamente en `127.0.0.1`. Carga un archivo SVG o EPS y pulsa **Calcular acomodo**. El archivo se procesa en el navegador mediante un Web Worker; la página no lo sube a ningún servidor.
+Abre `http://127.0.0.1:5175/`, carga un SVG o EPS con medidas físicas y define el tamaño de hoja, la separación entre piezas y el margen exterior. Los campos de la interfaz están en centímetros; el motor trabaja en milímetros. **Cancelar** detiene el Worker sin cerrar la página.
 
-En la página, ancho, alto, separación y margen se introducen en centímetros; el motor los convierte a milímetros. Cada hoja física se muestra completa; cuando hay varias, se colocan en columnas si el espacio lo permite. El fondo azul claro marca la franja contabilizada y la línea discontinua separa el resto disponible. **Hojas consumidas** suma las franjas usadas de todas las hojas y redondea hacia arriba al siguiente cuarto de hoja; **Hojas físicas** indica cuántas hojas aparecen en el acomodo.
+El resultado muestra cada hoja completa. **Hojas físicas** es el número de hojas utilizadas; **Hojas consumidas** suma la franja ocupada de cada una en cuartos de hoja. Una hoja con piezas solo en su primer cuarto cuenta como `0.25` hojas consumidas.
 
-El SVG debe tener `width` y `height` en `mm`, `cm`, `in` o `pt` y un `viewBox` válido. El importador admite `path`, `rect` (también redondeado), `circle`, `ellipse`, `polygon`, `polyline` con relleno y texto sencillo. Convierte el texto a contornos con Tinos o Arimo incorporadas, equivalentes libres de Times New Roman y Arial; la forma puede variar ligeramente si el archivo usó otra fuente. Omite rectángulos blancos que cubren todo el `viewBox` y textos con clase `label`, `annotation` o `caption`, pues los trata como fondo o anotaciones. El parser también admite líneas de path, Bézier cuadráticas y cúbicas, arcos, transformaciones SVG y `fill-rule` (`evenodd` o `nonzero`). Las líneas abiertas y el texto con `tspan` siguen requiriendo contornos cerrados.
+## Cómo acomoda las piezas
 
-El EPS debe ser vectorial y declarar `%%BoundingBox` o `%%HiResBoundingBox`; sus unidades son puntos PostScript (72 por pulgada). Admite una previsualización binaria encapsulada, instrucciones de dibujo, transformaciones, curvas Bézier y rellenos normal o par-impar. Cada operación de relleno produce una figura o un conjunto de figuras; los subcontornos interiores se conservan como agujeros. Los trazos abiertos, texto editable, imágenes raster y recortes complejos se rechazan con un mensaje específico para evitar que falte material en el acomodo. Convierte esos elementos a contornos cerrados en el editor antes de importar. La lectura de EPS usa [UDOC.js](https://github.com/NineBitsLLC/UDOC.js), incluido bajo su licencia MIT en `src/vendor/udoc/LICENSE`.
+1. **Lee la geometría.** Convierte el archivo a polígonos en milímetros. Conserva los agujeros de cada pieza según `fill-rule` y la orientación de los subtrazados. Las curvas se aproximan inicialmente con una tolerancia de `0.25 mm`.
+2. **Busca posiciones.** Ordena las piezas por área y prueba giros cada `15°`. Para calcular los NFP, triangula los contornos y une las sumas de Minkowski de los pares de triángulos con Clipper. Así conserva concavidades abiertas. Para los agujeros cerrados calcula un IFP; para los demás espacios evalúa contactos entre contornos y vértices del área libre.
+3. **Comprueba cada colocación.** Valida contra los polígonos reales, el margen y la separación solicitada. Suma al espacio exigido el error de aproximación de las curvas. Las operaciones de Clipper usan una rejilla de `0.0001 mm`.
+4. **Mejora el resultado.** Con hasta 40 piezas y 1500 vértices, compara acomodos mediante una búsqueda genética de 16 individuos y 30 generaciones por defecto. Prioriza menos hojas, menor franja de la última hoja y después menor altura y anchura usadas. En archivos mayores construye primero un acomodo rápido con seis ángulos (`0°`, `45°`, `90°`, `135°`, `180°` y `270°`). La mejora considera giros cada `15°` al recolocar piezas pequeñas en su hoja o en hojas anteriores, hasta donde alcance el tiempo. Genera candidatos con contactos entre contornos, vértices del NFP si ambos contornos tienen hasta 45 vértices y una cuadrícula de `20`, `5` y `1 mm`. Solo acepta movimientos que reduzcan el consumo, adelanten material o compacten la hoja sin empeorar la otra dimensión.
 
-## Motor
+La mejora del modo rápido se limita a piezas sin otras anidadas dentro y con un área no mayor al `3 %` de la hoja. El navegador espera como máximo `180 s` y el Worker usa un presupuesto de `170 s` para poder devolver el mejor acomodo válido que haya encontrado. El resultado es heurístico: la separación se valida, pero no se garantiza el acomodo óptimo.
 
-`GeometryParser.parseSvg(source, toleranceMm)` y `GeometryParser.parseEps(arrayBuffer, toleranceMm)` devuelven piezas con contorno exterior y agujeros en milímetros. `NestingEngine.run(pieces, config)` devuelve una promesa con el resultado; `runSync` usa el mismo núcleo cuando ya se está en un Worker o en Node.
+## Archivos admitidos
+
+- **SVG:** requiere `viewBox` y dimensiones físicas (`mm`, `cm`, `in` o `pt`). Admite `path`, `rect`, `circle`, `ellipse`, `polygon`, `polyline` rellena, transformaciones y texto sencillo con las fuentes Tinos, Arimo o UnifrakturCook incluidas. Las líneas abiertas y el texto con `tspan` deben convertirse a contornos cerrados.
+- **EPS:** requiere `%%BoundingBox` o `%%HiResBoundingBox` y geometría vectorial rellena. Admite curvas, transformaciones y agujeros. No procesa como piezas los trazos abiertos, texto editable, imágenes raster ni recortes complejos; conviene convertirlos a contornos antes de importarlos.
+
+El importador omite los fondos blancos que cubren el `viewBox` y los textos marcados como `label`, `annotation` o `caption`. La lectura de EPS incorpora [UDOC.js](https://github.com/NineBitsLLC/UDOC.js) bajo licencia MIT; su licencia está en `src/vendor/udoc/LICENSE`.
+
+## Uso desde código
 
 ```ts
 import {GeometryParser} from './src/engine/GeometryParser.ts';
@@ -36,20 +46,12 @@ const result = await NestingEngine.run(pieces, {
 });
 ```
 
-Los resultados incluyen la cantidad de hojas físicas, la fracción horizontal de la última hoja, el área neta expresada como hojas, y las métricas de hoja completa y cuartos compartidos. Son cantidades informativas; no hay precios monetarios.
+Para EPS, usa `GeometryParser.parseEps(arrayBuffer, 0.25)`. `result.placements` contiene posición, giro, hoja y relación con el agujero contenedor; `result.regions` contiene la fracción y dimensiones usadas por hoja. El motor acepta de 1 a 100 piezas. `NestingEngine.runSync` usa el mismo núcleo cuando ya se ejecuta dentro de un Worker o desde Node.
 
-El motor usa un margen de 20 mm contra los cuatro bordes de cada franja horizontal activa. El gap entre piezas es independiente. Prueba giros en incrementos de 15°. El parser clasifica contornos por winding (`nonzero`) o paridad (`evenodd`) y guarda cada agujero como un polígono del contorno principal. El NFP de formas cóncavas se obtiene uniendo las sumas de Minkowski de sus triángulos, sin convertir toda la forma en una envolvente convexa. Para cada agujero de una pieza ya colocada, el IFP resta del dominio de traslación el NFP del exterior del agujero; la heurística comprueba primero esos puntos. Las colocaciones guardan `parentPieceId`, `parentHoleIndex` y una jerarquía; `translatePlacementTree` traslada una pieza con todas las que contiene. No divide piezas. Solo devuelve `unplaceable` cuando ninguna rotación cabe en la hoja completa.
+## Verificación
 
-La curva se aproxima inicialmente con una desviación máxima de 0.25 mm por contorno. Para garantizar la separación respecto de las curvas del SVG, el validador reserva el error de ambas piezas sobre el gap, y reserva el error de cada pieza en el borde. Si una pieza queda demasiado ajustada para certificar su encaje, el Worker repite el cálculo con tolerancias menores. El motor utiliza una rejilla de 0.0001 mm, por lo que sus decisiones numéricas tienen esa resolución. Los resultados son heurísticos: se validan, pero no se garantiza el óptimo global.
-
-La población predeterminada es de 16 cromosomas durante 30 generaciones. Para SVG complejos (más de 40 piezas o 1500 vértices), usa un acomodo rápido como solución inicial. Una pasada adicional intenta girar y recolocar piezas pequeñas sin descendientes en su misma hoja o en hojas anteriores, incluidas cavidades abiertas y espacios entre piezas. Prueba contactos de contornos y NFP cuando el coste lo permite, además de una cuadrícula de 20, 5 y 1 mm; todas las posiciones se validan con los polígonos reales, el margen y la separación. Prioriza reducir las fracciones de hoja consumidas, después adelantar piezas y finalmente reducir las dimensiones usadas sin empeorar la otra dimensión. Entrega `method: 'fast'` y `limited: true`. El Worker reserva los últimos 10 segundos del límite de 180 segundos del navegador para devolver la mejor solución válida encontrada. El botón **Cancelar** termina el Worker y la interfaz muestra el progreso de la mejora.
-
-## Verificar
-
-```powershell
+```sh
 npm test
 npm run typecheck
 npm run build
 ```
-
-La aplicación es independiente de Digital.A y no modifica sus cotizaciones ni sus documentos históricos.
