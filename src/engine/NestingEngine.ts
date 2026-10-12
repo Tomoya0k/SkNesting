@@ -5,6 +5,27 @@ import {boundaryRings, cleanRing, polygonArea, triangulatePolygon} from './Polyg
 import type {NestingConfig, NestingResult, Piece, ProgressEvent, Rotation} from './types.ts';
 
 const empty = (error: string): NestingResult => ({placements: [], hierarchy: [], regions: [], sheetCount: 0, netAreaMm2: 0, usedMaterialSheets: 0, fullSheets: 0, sharedQuarterSheets: 0, limited: false, error, engineVersion: 'nfp-ga-v1'});
+const FAST_REPAIR_BUDGET_MS = 30_000;
+function fastScore(result: NestingResult, pieces: readonly Piece[], sheetArea: number): number[] {
+  const areaById = new Map(pieces.map(piece => [piece.id, polygonArea(piece.polygon)]));
+  const largeDiagonalArea = result.placements.reduce((sum, item) =>
+    item.rotation % 90 !== 0 && (areaById.get(item.pieceId) ?? 0) > sheetArea * 0.03
+      ? sum + (areaById.get(item.pieceId) ?? 0) : sum, 0);
+  return [
+    result.sheetCount,
+    result.regions.reduce((sum, region) => sum + region.fraction, 0),
+    largeDiagonalArea,
+    result.regions.reduce((sum, region) => sum + region.usedHeight, 0),
+    result.regions.reduce((sum, region) => sum + region.usedWidth, 0),
+  ];
+}
+function betterFastLayout(candidate: NestingResult, current: NestingResult, pieces: readonly Piece[], sheetArea: number): boolean {
+  if (candidate.error) return false;
+  if (current.error) return true;
+  const a = fastScore(candidate, pieces, sheetArea), b = fastScore(current, pieces, sheetArea);
+  for (let index = 0; index < a.length; index++) if (Math.abs(a[index] - b[index]) > 1e-7) return a[index] < b[index];
+  return false;
+}
 export class NestingEngine {
   static runSync(pieces: readonly Piece[], config: NestingConfig, onProgress?: (progress: ProgressEvent) => void, deadlineMs = performance.now() + 170_000): NestingResult {
     try {
@@ -24,10 +45,21 @@ export class NestingEngine {
       const vertices = pieces.reduce((count, piece) => count + boundaryRings(piece.polygon).reduce((sum, ring) => sum + ring.length, 0), 0);
       if (pieces.length > 40 || vertices > 1_500) {
         const fastRotations = rotations.length > 6 ? rotations.filter(rotation => [0, 45, 90, 135, 180, 270].includes(rotation)) : rotations;
-        const result = baseline(pieces, {...config, edgeMarginMm: edge, rotations: fastRotations.length ? fastRotations : rotations});
+        const trialRotations = fastRotations.length ? fastRotations : rotations;
+        const rightAngleRotations = trialRotations.filter(rotation => rotation % 90 === 0);
+        let result = baseline(pieces, {...config, edgeMarginMm: edge, rotations: trialRotations});
+        const areas = new Map(pieces.map(piece => [piece.id, polygonArea(piece.polygon)]));
+        const largeDiagonal = result.placements.some(item => item.rotation % 90 !== 0 &&
+          (areas.get(item.pieceId) ?? 0) > width * height * 0.03);
+        if (rightAngleRotations.length && rightAngleRotations.length < trialRotations.length &&
+            (result.error || (largeDiagonal && performance.now() < deadlineMs - FAST_REPAIR_BUDGET_MS))) {
+          const upright = baseline(pieces, {...config, edgeMarginMm: edge, rotations: rightAngleRotations});
+          if (betterFastLayout(upright, result, pieces, width * height)) result = upright;
+        }
         if (result.error) return result;
         let improved = result;
-        try { improved = improveFastLayout(pieces, {...config, edgeMarginMm: edge}, result, rotations, deadlineMs, onProgress); }
+        const repairDeadline = Math.min(deadlineMs, performance.now() + FAST_REPAIR_BUDGET_MS);
+        try { improved = improveFastLayout(pieces, {...config, edgeMarginMm: edge}, result, rotations, repairDeadline, onProgress); }
         catch { /* The certified initial layout remains usable if refinement fails. */ }
         return {...improved, limited: true, method: 'fast'};
       }
