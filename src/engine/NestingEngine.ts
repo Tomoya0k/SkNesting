@@ -62,6 +62,12 @@ export class NestingEngine {
         const repackDeadline = Math.min(deadlineMs - Math.min(15_000, Math.max(0, deadlineMs - performance.now()) / 4), performance.now() + REPACK_BUDGET_MS);
         try { result = improveRasterLayout(pieces, {...config, edgeMarginMm: edge}, result, rotations, repackDeadline, onProgress); }
         catch { /* Keep the complete certified layout if repacking fails. */ }
+        if (result.sheetCount > 1 && performance.now() < deadlineMs - 15_000) {
+          const largePieceDeadline = Math.min(deadlineMs - 15_000, performance.now() + 12_000);
+          try { result = improveFastLayout(pieces, {...config, edgeMarginMm: edge}, result, rotations, largePieceDeadline, undefined,
+            {maxAreaFraction: 1, lastSheetOnly: true, earlierSheetsOnly: true}); }
+          catch { /* Keep the complete certified layout if large-piece relocation fails. */ }
+        }
         let improved = result;
         const repairDeadline = Math.min(deadlineMs, performance.now() + FAST_REPAIR_BUDGET_MS);
         try { improved = improveFastLayout(pieces, {...config, edgeMarginMm: edge}, result, rotations, repairDeadline, onProgress); }

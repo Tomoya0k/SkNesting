@@ -4,6 +4,7 @@ import {NFPGenerator, WorkLimitError} from './NFPGenerator.ts';
 import type {NestingConfig, NestingResult, Piece, Placement, Point, ProgressEvent, Rotation} from './types.ts';
 
 interface Pose {shape: OrientedPiece; x: number; y: number; sheet: number; overlap: number; consumption: number; usedHeight: number; usedWidth: number}
+export interface FastPocketOptions {maxAreaFraction?: number; lastSheetOnly?: boolean; earlierSheetsOnly?: boolean}
 const QUARTERS = [0.25, 0.5, 0.75, 1] as const;
 const angleOrder = (angles: readonly Rotation[]) => [...angles].sort((a, b) => (a % 45 === 0 ? 0 : 1) - (b % 45 === 0 ? 0 : 1) || a - b);
 
@@ -59,7 +60,7 @@ function better(a: Pose, b: Pose | null): boolean {
 /** Improve a valid fast layout by rotating or relocating small leaf pieces. */
 export function improveFastLayout(
   pieces: readonly Piece[], config: NestingConfig, initial: NestingResult, rotations: readonly Rotation[],
-  deadlineMs: number, onProgress?: (progress: ProgressEvent) => void,
+  deadlineMs: number, onProgress?: (progress: ProgressEvent) => void, options: FastPocketOptions = {},
 ): NestingResult {
   if (initial.error || performance.now() >= deadlineMs) return initial;
   const started = performance.now(), sheetArea = config.sheetWidthMm * config.sheetHeightMm;
@@ -81,8 +82,11 @@ export function improveFastLayout(
 
   for (let pass = 0; pass < 2 && performance.now() < deadlineMs; pass++) {
     const parents = new Set(current.placements.flatMap(item => item.parentPieceId ? [item.parentPieceId] : []));
-    const movable = current.placements.filter(item => !parents.has(item.pieceId) && polygonArea(item.polygon) <= sheetArea * 0.03)
-      .sort((a, b) => b.sheet - a.sheet || polygonArea(a.polygon) - polygonArea(b.polygon) || a.pieceId.localeCompare(b.pieceId));
+    const maxArea = sheetArea * (options.maxAreaFraction ?? 0.03);
+    const movable = current.placements.filter(item => !parents.has(item.pieceId) && polygonArea(item.polygon) <= maxArea &&
+      (!options.lastSheetOnly || item.sheet === current.sheetCount - 1))
+      .sort((a, b) => b.sheet - a.sheet ||
+        (options.maxAreaFraction !== undefined && options.maxAreaFraction > 0.03 ? polygonArea(b.polygon) - polygonArea(a.polygon) : polygonArea(a.polygon) - polygonArea(b.polygon)) || a.pieceId.localeCompare(b.pieceId));
     let changed = false;
     for (const [index, mobile] of movable.entries()) {
       if (performance.now() >= deadlineMs) break;
@@ -93,7 +97,8 @@ export function improveFastLayout(
       const originalConsumption = current.regions.reduce((sum, region) => sum + region.fraction, 0);
       const sourceFraction = fractionFor(sourceWithout, shapes, config);
       let best: Pose | null = null;
-      for (let destination = 0; destination <= mobile.sheet && performance.now() < pieceDeadline; destination++) {
+      const destinationLimit = options.earlierSheetsOnly ? mobile.sheet - 1 : mobile.sheet;
+      for (let destination = 0; destination <= destinationLimit && performance.now() < pieceDeadline; destination++) {
         const placed = destination === mobile.sheet ? sourceWithout : sheets[destination];
         const originalFraction = fractionFor(placed, shapes, config);
         const edge = config.edgeMarginMm ?? 20;
