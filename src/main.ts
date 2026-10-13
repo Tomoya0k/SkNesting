@@ -1,6 +1,5 @@
 import './styles.css';
 import type {NestingConfig, NestingResult, Placement, ProgressEvent} from './engine/types.ts';
-import {EpsConverter} from './engine/EpsConverter.ts';
 import {readSvgSizeInfo} from './engine/SvgDimensions.ts';
 import {consumedSheets} from './sheetUsage.ts';
 
@@ -61,6 +60,8 @@ file.onchange = async () => {
     if (requestId !== fileReadId || file.files?.[0] !== selected) return;
     let dimensions: {widthMm: number; heightMm: number} | null, ratio: number | null, inferredDimension: 'width' | 'height' | null = null;
     if (format === 'eps') {
+      const {EpsConverter} = await import('./engine/EpsConverter.ts');
+      if (requestId !== fileReadId || file.files?.[0] !== selected) return;
       dimensions = EpsConverter.physicalDimensions(source as ArrayBuffer);
       ratio = dimensions.widthMm / dimensions.heightMm;
     } else {
