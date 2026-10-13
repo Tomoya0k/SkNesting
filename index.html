@@ -7,7 +7,7 @@
   </head>
   <body>
     <main class="app">
-      <header><h1>SkNesting</h1><p>Prueba local de acomodo de formas SVG y EPS</p></header>
+      <header><h1>SkNesting</h1></header>
       <section class="panel" aria-label="Parámetros de acomodo">
         <label class="file-label">Archivo SVG o EPS<input id="file" type="file" accept=".svg,.eps,image/svg+xml,application/postscript" /></label>
         <fieldset class="artwork-size">
@@ -16,8 +16,16 @@
             <label>Ancho del diseño (cm)<input id="artwork-width" type="number" min="0" step="any" inputmode="decimal" disabled /></label>
             <label>Alto del diseño (cm)<input id="artwork-height" type="number" min="0" step="any" inputmode="decimal" disabled /></label>
           </div>
-          <label class="aspect-lock"><input id="lock-aspect" type="checkbox" checked disabled /> Bloquear proporción</label>
-          <p id="artwork-help" class="field-help">Selecciona un SVG o EPS para mostrar o asignar sus medidas físicas.</p>
+          <label class="aspect-lock" title="Bloquear proporción">
+            <input id="lock-aspect" type="checkbox" aria-label="Bloquear proporción" checked disabled />
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path class="lock-shackle-closed" d="M6.5 8V6a3.5 3.5 0 0 1 7 0v2" />
+              <path class="lock-shackle-open" d="M6.5 8V6a3.5 3.5 0 0 1 6.35-2.05" />
+              <rect x="3.5" y="8" width="13" height="10" rx="2" />
+              <circle cx="10" cy="12.5" r="1" />
+              <path d="M10 13.5v1.75" />
+            </svg>
+          </label>
         </fieldset>
         <div class="fields">
           <label>Ancho de hoja (cm)<input id="width" type="number" min="0" step="any" value="180" /></label>

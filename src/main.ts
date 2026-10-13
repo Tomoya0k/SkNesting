@@ -6,7 +6,7 @@ import {consumedSheets} from './sheetUsage.ts';
 
 const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const file = get<HTMLInputElement>('file'), width = get<HTMLInputElement>('width'), height = get<HTMLInputElement>('height'), gap = get<HTMLInputElement>('gap'), edge = get<HTMLInputElement>('edge');
-const artworkWidth = get<HTMLInputElement>('artwork-width'), artworkHeight = get<HTMLInputElement>('artwork-height'), lockAspect = get<HTMLInputElement>('lock-aspect'), artworkHelp = get<HTMLParagraphElement>('artwork-help');
+const artworkWidth = get<HTMLInputElement>('artwork-width'), artworkHeight = get<HTMLInputElement>('artwork-height'), lockAspect = get<HTMLInputElement>('lock-aspect');
 const calculate = get<HTMLButtonElement>('calculate'), cancel = get<HTMLButtonElement>('cancel'), status = get<HTMLParagraphElement>('status');
 const progress = get<HTMLProgressElement>('progress'), results = get<HTMLElement>('results'), summary = get<HTMLElement>('summary');
 const sheetStage = get<HTMLElement>('sheet-stage');
@@ -18,17 +18,6 @@ const fmt = (value: number, digits = 2) => Number(value.toFixed(digits)).toLocal
 const cmToMm = (value: string) => Number(value) * 10;
 const cmValue = (millimeters: number) => String(Number((millimeters / 10).toFixed(4)));
 function setStatus(message: string, error = false) { status.textContent = message; status.classList.toggle('error', error); }
-function updateArtworkHelp() {
-  if (!loadedArtwork) return;
-  const w = Number(artworkWidth.value), h = Number(artworkHeight.value);
-  if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) {
-    artworkHelp.textContent = `Tamaño aplicado: ${fmt(w, 4)} × ${fmt(h, 4)} cm${lockAspect.checked ? ' · proporción bloqueada' : ''}.`;
-  } else if (artworkRatio !== null) {
-    artworkHelp.textContent = `El archivo no declara ambas medidas físicas. Indica el ancho o el alto; se conservará la proporción ${fmt(artworkRatio, 4)}:1.`;
-  } else {
-    artworkHelp.textContent = 'El archivo no declara medidas físicas. Indica el ancho y el alto del diseño.';
-  }
-}
 function syncArtworkDimension(changed: 'width' | 'height') {
   if (lockAspect.checked && artworkRatio !== null) {
     const source = changed === 'width' ? artworkWidth : artworkHeight;
@@ -37,7 +26,6 @@ function syncArtworkDimension(changed: 'width' | 'height') {
     if (!source.value.trim() || !Number.isFinite(value) || value <= 0) target.value = '';
     else target.value = String(Number((changed === 'width' ? value / artworkRatio : value * artworkRatio).toFixed(4)));
   }
-  updateArtworkHelp();
   results.hidden = true;
   if (!calculate.disabled) {
     const w = Number(artworkWidth.value), h = Number(artworkHeight.value);
@@ -55,7 +43,6 @@ function setArtworkDimensions(widthMm: number | null, heightMm: number | null, a
   artworkWidth.disabled = artworkHeight.disabled = lockAspect.disabled = false;
   artworkWidth.value = widthMm !== null ? cmValue(widthMm) : '';
   artworkHeight.value = heightMm !== null ? cmValue(heightMm) : '';
-  updateArtworkHelp();
 }
 file.onchange = async () => {
   const requestId = ++fileReadId, selected = file.files?.[0];
@@ -63,7 +50,6 @@ file.onchange = async () => {
   loadedArtwork = null; artworkRatio = null;
   artworkWidth.value = artworkHeight.value = '';
   artworkWidth.disabled = artworkHeight.disabled = lockAspect.disabled = true;
-  artworkHelp.textContent = selected ? 'Leyendo las medidas del archivo…' : 'Selecciona un SVG o EPS para mostrar o asignar sus medidas físicas.';
   if (!selected) { setStatus('Carga un SVG con medidas físicas o un EPS con BoundingBox.'); return; }
   const format = detectFormat(selected);
   if (!format) { setStatus('Selecciona un archivo SVG o EPS.', true); return; }
@@ -88,7 +74,6 @@ file.onchange = async () => {
     else setStatus('El archivo no declara las dos medidas físicas; puedes asignarlas en los campos de arriba.');
   } catch (error) {
     if (requestId !== fileReadId) return;
-    artworkHelp.textContent = 'No se pudieron leer las medidas. Revisa el archivo o asigna las dimensiones si su estructura es válida.';
     setStatus(error instanceof Error ? error.message : String(error), true);
   }
 };
