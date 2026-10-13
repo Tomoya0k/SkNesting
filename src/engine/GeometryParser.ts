@@ -2,6 +2,7 @@ import {XMLParser, XMLValidator} from 'fast-xml-parser';
 import {SVGPathData} from 'svg-pathdata';
 import {cleanRing, filledRings} from './PolygonOperations.ts';
 import {EpsConverter} from './EpsConverter.ts';
+import {physicalMm, type PhysicalDimensions} from './SvgDimensions.ts';
 import type {Piece, Point, Ring} from './types.ts';
 import type {Font} from 'opentype.js';
 
@@ -147,15 +148,6 @@ function parsePathData(d: string, matrix: Matrix, tolerance: number): {rings: Ri
   finish(false);
   return {rings, curved};
 }
-function physicalMm(value: string | undefined): number {
-  const match = value?.trim().match(/^([+]?(?:\d+(?:\.\d*)?|\.\d+))\s*(mm|cm|in|pt)$/i);
-  if (!match) throw new Error('El SVG debe declarar width y height en mm, cm, in o pt.');
-  const factor = {mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72}[match[2].toLowerCase() as 'mm' | 'cm' | 'in' | 'pt'];
-  const result = Number(match[1]) * factor;
-  if (!Number.isFinite(result) || result <= 0) throw new Error('Dimensión física SVG inválida.');
-  return result;
-}
-
 type Style = Record<string, string>;
 export interface SvgFonts {serif: Font; serifBold: Font; sans: Font; sansBold: Font; gothic?: Font}
 const declarations = (source: string): Style => Object.fromEntries(source.split(';').map(part => {
@@ -217,11 +209,11 @@ function textPath(value: string, attrs: Record<string, string>, style: Style, fo
 
 export interface ParsedSvg { widthMm: number; heightMm: number; pieces: Piece[] }
 export class GeometryParser {
-  static parseEps(source: ArrayBuffer, toleranceMm = 0.25): ParsedSvg {
-    return GeometryParser.parseSvg(EpsConverter.toSvg(source), toleranceMm);
+  static parseEps(source: ArrayBuffer, toleranceMm = 0.25, dimensions?: PhysicalDimensions): ParsedSvg {
+    return GeometryParser.parseSvg(EpsConverter.toSvg(source), toleranceMm, undefined, dimensions);
   }
 
-  static parseSvg(source: string, toleranceMm = 0.25, fonts?: SvgFonts): ParsedSvg {
+  static parseSvg(source: string, toleranceMm = 0.25, fonts?: SvgFonts, dimensions?: PhysicalDimensions): ParsedSvg {
     if (!Number.isFinite(toleranceMm) || toleranceMm <= 0 || toleranceMm > 5) throw new Error('La tolerancia debe estar entre 0 y 5 mm.');
     if (source.length > 8_000_000 || /<!DOCTYPE|<!ENTITY/i.test(source)) throw new Error('SVG demasiado grande o con entidades no admitidas.');
     const valid = XMLValidator.validate(source);
@@ -230,7 +222,8 @@ export class GeometryParser {
     const root = parsed.find(entry => Object.keys(entry).some(key => key.replace(/^.*:/, '') === 'svg'));
     if (!root) throw new Error('El archivo no contiene un elemento svg.');
     const rootAttrs = (root[':@'] ?? {}) as Record<string, string>;
-    const widthMm = physicalMm(rootAttrs.width), heightMm = physicalMm(rootAttrs.height);
+    const widthMm = dimensions?.widthMm ?? physicalMm(rootAttrs.width), heightMm = dimensions?.heightMm ?? physicalMm(rootAttrs.height);
+    if (![widthMm, heightMm].every(value => Number.isFinite(value) && value > 0)) throw new Error('Las medidas físicas del SVG deben ser mayores que cero.');
     const view = rootAttrs.viewBox?.trim().split(/[\s,]+/).map(Number);
     if (!view || view.length !== 4 || !view.every(Number.isFinite) || view[2] <= 0 || view[3] <= 0) throw new Error('El SVG necesita un viewBox válido.');
     const physical: Matrix = [widthMm / view[2], 0, 0, heightMm / view[3], -view[0] * widthMm / view[2], -view[1] * heightMm / view[3]];

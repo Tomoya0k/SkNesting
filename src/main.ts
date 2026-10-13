@@ -1,16 +1,106 @@
 import './styles.css';
 import type {NestingConfig, NestingResult, Placement, ProgressEvent} from './engine/types.ts';
+import {EpsConverter} from './engine/EpsConverter.ts';
+import {readSvgSizeInfo} from './engine/SvgDimensions.ts';
 import {consumedSheets} from './sheetUsage.ts';
 
 const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const file = get<HTMLInputElement>('file'), width = get<HTMLInputElement>('width'), height = get<HTMLInputElement>('height'), gap = get<HTMLInputElement>('gap'), edge = get<HTMLInputElement>('edge');
+const artworkWidth = get<HTMLInputElement>('artwork-width'), artworkHeight = get<HTMLInputElement>('artwork-height'), lockAspect = get<HTMLInputElement>('lock-aspect'), artworkHelp = get<HTMLParagraphElement>('artwork-help');
 const calculate = get<HTMLButtonElement>('calculate'), cancel = get<HTMLButtonElement>('cancel'), status = get<HTMLParagraphElement>('status');
 const progress = get<HTMLProgressElement>('progress'), results = get<HTMLElement>('results'), summary = get<HTMLElement>('summary');
 const sheetStage = get<HTMLElement>('sheet-stage');
 let worker: Worker | null = null, active = 0, current: NestingResult | null = null, config: NestingConfig | null = null;
+type FileFormat = 'svg' | 'eps';
+type LoadedArtwork = {file: File; format: FileFormat; source: string | ArrayBuffer; aspectRatio: number | null};
+let loadedArtwork: LoadedArtwork | null = null, artworkRatio: number | null = null, fileReadId = 0;
 const fmt = (value: number, digits = 2) => Number(value.toFixed(digits)).toLocaleString('es-MX', {maximumFractionDigits: digits});
 const cmToMm = (value: string) => Number(value) * 10;
+const cmValue = (millimeters: number) => String(Number((millimeters / 10).toFixed(4)));
 function setStatus(message: string, error = false) { status.textContent = message; status.classList.toggle('error', error); }
+function updateArtworkHelp() {
+  if (!loadedArtwork) return;
+  const w = Number(artworkWidth.value), h = Number(artworkHeight.value);
+  if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) {
+    artworkHelp.textContent = `Tamaño aplicado: ${fmt(w, 4)} × ${fmt(h, 4)} cm${lockAspect.checked ? ' · proporción bloqueada' : ''}.`;
+  } else if (artworkRatio !== null) {
+    artworkHelp.textContent = `El archivo no declara ambas medidas físicas. Indica el ancho o el alto; se conservará la proporción ${fmt(artworkRatio, 4)}:1.`;
+  } else {
+    artworkHelp.textContent = 'El archivo no declara medidas físicas. Indica el ancho y el alto del diseño.';
+  }
+}
+function syncArtworkDimension(changed: 'width' | 'height') {
+  if (lockAspect.checked && artworkRatio !== null) {
+    const source = changed === 'width' ? artworkWidth : artworkHeight;
+    const target = changed === 'width' ? artworkHeight : artworkWidth;
+    const value = Number(source.value);
+    if (!source.value.trim() || !Number.isFinite(value) || value <= 0) target.value = '';
+    else target.value = String(Number((changed === 'width' ? value / artworkRatio : value * artworkRatio).toFixed(4)));
+  }
+  updateArtworkHelp();
+  results.hidden = true;
+  if (!calculate.disabled) {
+    const w = Number(artworkWidth.value), h = Number(artworkHeight.value);
+    setStatus(Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0 ?
+      `Tamaño físico listo: ${fmt(w, 4)} × ${fmt(h, 4)} cm.` :
+      'Completa el ancho y el alto físicos del diseño para calcular el acomodo.');
+  }
+}
+function detectFormat(selected: File): FileFormat | null {
+  return /\.eps$/i.test(selected.name) || selected.type === 'application/postscript' ? 'eps' :
+    /\.svg$/i.test(selected.name) || selected.type === 'image/svg+xml' ? 'svg' : null;
+}
+function setArtworkDimensions(widthMm: number | null, heightMm: number | null, aspectRatio: number | null) {
+  artworkRatio = aspectRatio;
+  artworkWidth.disabled = artworkHeight.disabled = lockAspect.disabled = false;
+  artworkWidth.value = widthMm !== null ? cmValue(widthMm) : '';
+  artworkHeight.value = heightMm !== null ? cmValue(heightMm) : '';
+  updateArtworkHelp();
+}
+file.onchange = async () => {
+  const requestId = ++fileReadId, selected = file.files?.[0];
+  results.hidden = true;
+  loadedArtwork = null; artworkRatio = null;
+  artworkWidth.value = artworkHeight.value = '';
+  artworkWidth.disabled = artworkHeight.disabled = lockAspect.disabled = true;
+  artworkHelp.textContent = selected ? 'Leyendo las medidas del archivo…' : 'Selecciona un SVG o EPS para mostrar o asignar sus medidas físicas.';
+  if (!selected) { setStatus('Carga un SVG con medidas físicas o un EPS con BoundingBox.'); return; }
+  const format = detectFormat(selected);
+  if (!format) { setStatus('Selecciona un archivo SVG o EPS.', true); return; }
+  const limitMb = format === 'eps' ? 16 : 8;
+  if (selected.size > limitMb * 1_000_000) { setStatus(`El archivo supera ${limitMb} MB.`, true); return; }
+  setStatus('Leyendo las medidas físicas del diseño…');
+  try {
+    const source = format === 'eps' ? await selected.arrayBuffer() : await selected.text();
+    if (requestId !== fileReadId || file.files?.[0] !== selected) return;
+    let dimensions: {widthMm: number; heightMm: number} | null, ratio: number | null, inferredDimension: 'width' | 'height' | null = null;
+    if (format === 'eps') {
+      dimensions = EpsConverter.physicalDimensions(source as ArrayBuffer);
+      ratio = dimensions.widthMm / dimensions.heightMm;
+    } else {
+      const size = readSvgSizeInfo(source as string);
+      dimensions = size.dimensions; ratio = size.aspectRatio;
+      inferredDimension = size.inferredDimension;
+    }
+    loadedArtwork = {file: selected, format, source, aspectRatio: ratio};
+    setArtworkDimensions(dimensions?.widthMm ?? null, dimensions?.heightMm ?? null, ratio);
+    if (dimensions) setStatus(`Medidas ${inferredDimension ? 'detectadas y completadas con la proporción del viewBox' : 'detectadas'}: ${fmt(dimensions.widthMm / 10, 4)} × ${fmt(dimensions.heightMm / 10, 4)} cm.`);
+    else setStatus('El archivo no declara las dos medidas físicas; puedes asignarlas en los campos de arriba.');
+  } catch (error) {
+    if (requestId !== fileReadId) return;
+    artworkHelp.textContent = 'No se pudieron leer las medidas. Revisa el archivo o asigna las dimensiones si su estructura es válida.';
+    setStatus(error instanceof Error ? error.message : String(error), true);
+  }
+};
+artworkWidth.oninput = () => syncArtworkDimension('width');
+artworkHeight.oninput = () => syncArtworkDimension('height');
+lockAspect.onchange = () => {
+  if (lockAspect.checked) {
+    const w = Number(artworkWidth.value), h = Number(artworkHeight.value);
+    if (w > 0 && h > 0 && Number.isFinite(w) && Number.isFinite(h)) artworkRatio = w / h;
+  }
+  syncArtworkDimension('width');
+};
 function ringPath(ring: {x: number; y: number}[]) { return ring.map((point, index) => `${index ? 'L' : 'M'}${point.x} ${point.y}`).join(' ') + ' Z'; }
 function placementPath(placement: Placement) { const visit = (polygon: Placement['polygon']): string => [ringPath(polygon.outer), ...polygon.holes.map(visit)].join(' '); return visit(placement.polygon); }
 function render() {
@@ -68,21 +158,29 @@ function render() {
     sheetCard.append(heading, usage, svg); sheetStage.append(sheetCard);
   }
 }
-function stop() { if (worker) { worker.terminate(); worker = null; } calculate.disabled = false; cancel.disabled = true; progress.hidden = true; }
+function stop() {
+  if (worker) { worker.terminate(); worker = null; }
+  calculate.disabled = false; cancel.disabled = true; progress.hidden = true; file.disabled = false;
+  artworkWidth.disabled = artworkHeight.disabled = lockAspect.disabled = !loadedArtwork;
+}
 calculate.onclick = async () => {
   const selected = file.files?.[0];
   if (!selected) { setStatus('Selecciona un archivo SVG o EPS.', true); return; }
-  const format = /\.eps$/i.test(selected.name) || selected.type === 'application/postscript' ? 'eps' : /\.svg$/i.test(selected.name) || selected.type === 'image/svg+xml' ? 'svg' : null;
+  const format = detectFormat(selected);
   if (!format) { setStatus('Selecciona un archivo SVG o EPS.', true); return; }
+  if (!loadedArtwork || loadedArtwork.file !== selected || loadedArtwork.format !== format) { setStatus('Espera a que termine de leer las medidas del archivo.', true); return; }
   const limitMb = format === 'eps' ? 16 : 8;
   if (selected.size > limitMb * 1_000_000) { setStatus(`El archivo supera ${limitMb} MB.`, true); return; }
+  const artworkWidthMm = cmToMm(artworkWidth.value), artworkHeightMm = cmToMm(artworkHeight.value);
+  if ([artworkWidth.value, artworkHeight.value].some(value => !value.trim()) || ![artworkWidthMm, artworkHeightMm].every(value => Number.isFinite(value) && value > 0)) { setStatus('Indica un ancho y un alto físicos mayores que cero para el diseño, en cm.', true); return; }
   const sheetWidthMm = cmToMm(width.value), sheetHeightMm = cmToMm(height.value), gapMm = cmToMm(gap.value), edgeMarginMm = cmToMm(edge.value);
   if ([width, height, gap, edge].some(input => !input.value.trim()) || ![sheetWidthMm, sheetHeightMm, gapMm, edgeMarginMm].every(Number.isFinite) || sheetWidthMm <= 2 * edgeMarginMm || sheetHeightMm <= 2 * edgeMarginMm || edgeMarginMm < 0 || gapMm < 0) { setStatus('Indica dimensiones mayores que el doble del margen y separaciones no negativas, en cm.', true); return; }
   stop(); results.hidden = true; current = null;
-  config = {sheetWidthMm, sheetHeightMm, gapMm, edgeMarginMm, curveToleranceMm: 0.25};
-  const source = format === 'eps' ? await selected.arrayBuffer() : await selected.text(), id = ++active;
+  config = {sheetWidthMm, sheetHeightMm, gapMm, edgeMarginMm, curveToleranceMm: 0.25, artworkWidthMm, artworkHeightMm};
+  const source = loadedArtwork.source, id = ++active;
   worker = new Worker(new URL('./nesting.worker.ts', import.meta.url), {type: 'module'});
   calculate.disabled = true; cancel.disabled = false; progress.hidden = false; progress.value = 0;
+  file.disabled = artworkWidth.disabled = artworkHeight.disabled = lockAspect.disabled = true;
   setStatus(`Analizando ${format.toUpperCase()} y calculando acomodo…`);
   const timeout = window.setTimeout(() => { if (worker && id === active) { stop(); setStatus('El cálculo superó 180 segundos. Simplifica el SVG o reduce las piezas.', true); } }, 180_000);
   worker.onmessage = (event: MessageEvent<{id: number; kind: string; result?: NestingResult; progress?: ProgressEvent; message?: string}>) => {

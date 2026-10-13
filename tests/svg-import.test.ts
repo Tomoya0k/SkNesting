@@ -6,6 +6,7 @@ import {GeometryParser, type SvgFonts} from '../src/engine/GeometryParser.ts';
 import {NestingEngine} from '../src/engine/NestingEngine.ts';
 import {rotatePiece} from '../src/engine/BottomLeftPlacer.ts';
 import {materialOverlaps, minimumBoundaryDistance, polygonArea} from '../src/engine/PolygonOperations.ts';
+import {readSvgSizeInfo} from '../src/engine/SvgDimensions.ts';
 import {consumedSheets} from '../src/sheetUsage.ts';
 
 async function font(path: string) {
@@ -36,6 +37,28 @@ test('convierte rectángulos redondeados, círculos, elipses y polígonos', () =
   const {pieces} = GeometryParser.parseSvg(source);
   assert.deepEqual(pieces.map(piece => piece.id), ['redondo', 'circulo', 'elipse', 'triangulo']);
   assert.ok(pieces.slice(0, 3).every(piece => piece.approximationErrorMm >= 0.25));
+});
+
+test('lee dimensiones físicas declaradas y conserva la proporción del viewBox', () => {
+  const declared = readSvgSizeInfo('<svg width="20cm" height="100mm" viewBox="0 0 400 200"/>');
+  assert.deepEqual(declared.dimensions, {widthMm: 200, heightMm: 100});
+  assert.equal(declared.aspectRatio, 2);
+  const partial = readSvgSizeInfo('<svg width="20cm" viewBox="0 0 400 200"/>');
+  assert.deepEqual(partial.dimensions, {widthMm: 200, heightMm: 100});
+  assert.equal(partial.inferredDimension, 'height');
+  const unspecified = readSvgSizeInfo('<svg viewBox="10 20 400 200"/>');
+  assert.equal(unspecified.dimensions, null);
+  assert.equal(unspecified.aspectRatio, 2);
+});
+
+test('permite asignar medidas físicas a un SVG sin width/height y escala el arte completo', () => {
+  const source = '<svg viewBox="0 0 100 50"><rect x="10" y="5" width="80" height="40"/></svg>';
+  assert.throws(() => GeometryParser.parseSvg(source), /width y height/);
+  const parsed = GeometryParser.parseSvg(source, 0.25, undefined, {widthMm: 200, heightMm: 100});
+  assert.equal(parsed.widthMm, 200);
+  assert.equal(parsed.heightMm, 100);
+  assert.equal(Math.max(...parsed.pieces[0].polygon.outer.map(point => point.x)), 180);
+  assert.equal(Math.max(...parsed.pieces[0].polygon.outer.map(point => point.y)), 90);
 });
 
 test('acomoda el SVG complejo de Ciudad Maderas sin agotar el cálculo', async () => {

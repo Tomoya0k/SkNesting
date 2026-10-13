@@ -19,6 +19,9 @@ export interface NestingConfig {
   gapMm: number;
   edgeMarginMm?: number;
   curveToleranceMm?: number;
+  /** Physical size assigned to the imported vector artwork, in mm. */
+  artworkWidthMm?: number;
+  artworkHeightMm?: number;
   rotations?: readonly Rotation[];
   populationSize?: number;
   generations?: number;

@@ -29,7 +29,9 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     const fonts = /<text(?:\s|>)/i.test(svg) ? await loadFonts() : undefined;
     let result: NestingResult | null = null;
     for (let tolerance = config.curveToleranceMm ?? 0.25, retry = 0; retry < 5; retry++, tolerance /= 2) {
-      const parsed = GeometryParser.parseSvg(svg, tolerance, fonts);
+      const artworkDimensions = config.artworkWidthMm !== undefined && config.artworkHeightMm !== undefined ?
+        {widthMm: config.artworkWidthMm, heightMm: config.artworkHeightMm} : undefined;
+      const parsed = GeometryParser.parseSvg(svg, tolerance, fonts, artworkDimensions);
       result = NestingEngine.runSync(parsed.pieces, {...config, curveToleranceMm: tolerance}, progress => send({id, kind: 'progress', progress}), deadlineMs);
       if (!result.error?.includes('No se pudo certificar el encaje')) break;
     }

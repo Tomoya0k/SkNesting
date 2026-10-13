@@ -10,6 +10,9 @@ const buffer = (data: Uint8Array) => data.buffer.slice(data.byteOffset, data.byt
 
 test('importa EPS vectorial con medidas, varias piezas y agujero cerrado', async () => {
   const eps = buffer(await source());
+  const size = EpsConverter.physicalDimensions(eps);
+  assert.ok(Math.abs(size.widthMm - 200 * 25.4 / 72) < 1e-10);
+  assert.ok(Math.abs(size.heightMm - 100 * 25.4 / 72) < 1e-10);
   const parsed = GeometryParser.parseEps(eps);
   assert.ok(Math.abs(parsed.widthMm - 200 * 25.4 / 72) < 1e-8);
   assert.ok(Math.abs(parsed.heightMm - 100 * 25.4 / 72) < 1e-8);
@@ -19,6 +22,13 @@ test('importa EPS vectorial con medidas, varias piezas y agujero cerrado', async
   const result = NestingEngine.runSync(parsed.pieces, {sheetWidthMm: 100, sheetHeightMm: 100, gapMm: 5, edgeMarginMm: 2});
   assert.ok(!result.error);
   assert.equal(result.placements.length, 2);
+});
+
+test('escala el EPS a las dimensiones físicas elegidas en la interfaz', async () => {
+  const parsed = GeometryParser.parseEps(buffer(await source()), 0.25, {widthMm: 400, heightMm: 200});
+  assert.equal(parsed.widthMm, 400);
+  assert.equal(parsed.heightMm, 200);
+  assert.ok(Math.max(...parsed.pieces[0].polygon.outer.map(point => point.x)) > 100);
 });
 
 test('extrae el bloque PostScript de un EPS con previsualización binaria', async () => {

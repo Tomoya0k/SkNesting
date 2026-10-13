@@ -8,6 +8,12 @@ header p{margin:6px 0;color:#64748b}
 .panel{background:white;border:1px solid #d9e2ec;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 2px 8px #0f172a08}
 label{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:.9rem}
 .file-label{margin-bottom:16px}
+.artwork-size{min-width:0;margin:0 0 16px;padding:12px;border:1px solid #e2e8f0;border-radius:8px}
+.artwork-size legend{padding:0 6px;font-size:.9rem;font-weight:600}
+.artwork-size-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:540px}
+.aspect-lock{display:inline-flex;flex-direction:row;align-items:center;gap:8px;margin-top:10px;font-weight:500}
+.aspect-lock input{width:16px;height:16px;margin:0;accent-color:#1d4ed8}
+.field-help{margin:8px 0 0;color:#64748b;font-size:.85rem;font-weight:400}
 .fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 input{font:inherit;width:100%;padding:9px;border:1px solid #b8c6d6;border-radius:7px}
 .actions{display:flex;gap:10px;margin-top:18px}

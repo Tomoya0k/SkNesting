@@ -67,6 +67,13 @@ function svgPath(path: PsPath, bounds: Box): string {
 
 /** Turns a vector EPS into SVG paths in physical PostScript-point units. */
 export class EpsConverter {
+  static physicalDimensions(input: ArrayBuffer): {widthMm: number; heightMm: number} {
+    if (input.byteLength > 16_000_000) throw new Error('El EPS supera 16 MB.');
+    const source = new TextDecoder('latin1').decode(postScriptData(input));
+    const bounds = readBounds(source);
+    return {widthMm: (bounds[2] - bounds[0]) * PT_TO_MM, heightMm: (bounds[3] - bounds[1]) * PT_TO_MM};
+  }
+
   static toSvg(input: ArrayBuffer): string {
     if (input.byteLength > 16_000_000) throw new Error('El EPS supera 16 MB.');
     const postScript = postScriptData(input);
